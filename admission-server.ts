@@ -50,10 +50,12 @@ export class AdmissionServer {
       return new Response(this.buildConfigManifest(origin, hostname));
     }
 
-    if (pathname === '/') return new Response(`
-This is a webhook server specifically for Kubernetes AdmissionReview purposes.\n
-$ kubectl apply -f "${origin}/webhook-config.yaml"\n
-See also: ${this.metadata.repo}`.slice(1));
+    if (pathname === '/') return new Response(`<!doctype html>\n<title>${origin}</title>
+<p>This is a webhook server specifically for Kubernetes AdmissionReview purposes.\n
+<p><code>$ kubectl apply -f "<a href="${origin}/webhook-config.yaml">${origin}/webhook-config.yaml</a>"</code>\n
+<p>See also: <a href="${this.metadata.repo}">${this.metadata.repo}</a>`, {
+  headers: { 'content-type': 'text/html' },
+});
 
     const isMutate = pathname === '/admission/mutate';
     const isValidate = pathname === '/admission/validate';
