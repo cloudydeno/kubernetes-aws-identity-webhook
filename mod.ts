@@ -24,6 +24,16 @@ new AdmissionServer(raw => {
     patch: patches.length > 0 ? new TextEncoder().encode(JSON.stringify(patches)) : null,
     patchType: patches.length > 0 ? 'JSONPatch' : null,
   };
+}, {
+  name: 'aws-identity-webhook',
+  type: 'MutatingWebhook',
+  repo: 'https://github.com/cloudydeno/kubernetes-aws-identity-webhook',
+  rules: `
+  - apiGroups: [""]
+    apiVersions: [v1]
+    operations: [CREATE]
+    resources: [pods]
+    scope: '*'`,
 }).registerFetchEvent();
 
 function appendPodPatches(request: AdmissionRequest<CoreV1.Pod>, patches: JsonPatch) {

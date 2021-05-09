@@ -5,7 +5,13 @@ const repoUrl = `https://github.com/cloudydeno/kubernetes-aws-identity-webhook`;
 
 export class AdmissionServer {
   constructor(
-    private callback: (req: AdmissionRequest<JSONValue>) => AdmissionResponse | Promise<AdmissionResponse>,
+    public callback: (req: AdmissionRequest<JSONValue>) => AdmissionResponse | Promise<AdmissionResponse>,
+    public metadata: {
+      name: string;
+      type: 'MutatingWebhook' | 'ValidatingWebhook';
+      repo: string;
+      rules: string;
+    },
   ) {}
 
   registerFetchEvent() {
@@ -22,9 +28,36 @@ export class AdmissionServer {
   }
 
   async handleRequest(request: Request) {
-    const {pathname} = new URL(request.url);
+    const {pathname, origin, hostname} = new URL(request.url);
+
+    if (pathname === "/webhook-config.yaml") {
+      const yaml = `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ${this.metadata.type}Configuration
+metadata:
+  name: '${this.metadata.name}'
+  labels:
+    app: '${this.metadata.name}'
+  annotations:
+    repo: '${this.metadata.repo}'
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    url: '${origin}/admission-webhook'
+  failurePolicy: Fail
+  matchPolicy: Exact
+  name: '${hostname}'
+  reinvocationPolicy: IfNeeded
+  rules: ${this.metadata.rules}
+  sideEffects: None`.slice(1);
+      return new Response(yaml);
+    }
+
     if (pathname !== "/admission-webhook") return new Response(
-      `This is a webhook server specifically for Kubernetes AdmissionReview purposes.\nSee also: ${repoUrl}`,
+      `This is a webhook server specifically for Kubernetes AdmissionReview purposes.
+$ kubectl apply -f "${origin}/webhook-config.yaml"
+See also: ${repoUrl}`,
       { status: 404 });
 
     if (request.method !== "POST") return new Response(
