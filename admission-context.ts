@@ -1,5 +1,4 @@
 import type {
-  JSONValue,
   JsonPatchOp,
 } from "https://deno.land/x/kubernetes_apis@v0.3.1/common.ts";
 import type {
@@ -17,7 +16,7 @@ export interface WebhookRule {
 
 export class AdmissionContext {
   constructor(
-    public request: AdmissionRequest<JSONValue>,
+    public request: AdmissionRequest,
   ) {
     this.response = {
       uid: request.uid,

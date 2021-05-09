@@ -8,56 +8,31 @@ import * as Base64 from "https://deno.land/std@0.95.0/encoding/base64.ts";
 // This file looks like a normal /x/kubernetes_apis file, but it's actually handwritten
 // Because AdmissionReview is never served by APIServer, the OpenAPI file completely excludes it
 
+
 /** AdmissionReview is the primary payload that gets transfered in both directions */
 export interface AdmissionReview {
   apiVersion?: "admission.k8s.io/v1";
   kind?: "AdmissionReview";
-  request?: AdmissionRequest<c.JSONValue> | null;
+  request?: AdmissionRequest | null;
   response?: AdmissionResponse | null;
 }
 export function toAdmissionReview(input: c.JSONValue): AdmissionReview & c.ApiKind {
   const obj = c.checkObj(input);
   return {
     ...c.assertOrAddApiVersionAndKind(obj, "admission.k8s.io/v1", "AdmissionReview"),
-    request: c.readOpt(obj["request"], x => toAdmissionRequest(x, x => x)),
+    request: c.readOpt(obj["request"], x => toAdmissionRequest(x)),
     response: c.readOpt(obj["response"], toAdmissionResponse),
   }}
 export function fromAdmissionReview(input: AdmissionReview): c.JSONValue {
   return {
     ...c.assertOrAddApiVersionAndKind(input, "admission.k8s.io/v1", "AdmissionReview"),
     ...input,
-    request: input.request != null ? fromAdmissionRequest(input.request, x => x) : undefined,
+    request: input.request != null ? fromAdmissionRequest(input.request) : undefined,
     response: input.response != null ? fromAdmissionResponse(input.response) : undefined,
   }}
 
-export interface GroupVersionKind {
-  group:   string;
-  version: string;
-  kind:    string;
-}
-export function toGroupVersionKind(input: c.JSONValue): GroupVersionKind {
-  const obj = c.checkObj(input);
-  return {
-    group: c.checkStr(obj["group"]),
-    version: c.checkStr(obj["version"]),
-    kind: c.checkStr(obj["kind"]),
-  }}
 
-export interface GroupVersionResource {
-  group:    string;
-  version:  string;
-  resource: string;
-}
-export function toGroupVersionResource(input: c.JSONValue): GroupVersionResource {
-  const obj = c.checkObj(input);
-  return {
-    group: c.checkStr(obj["group"]),
-    version: c.checkStr(obj["version"]),
-    resource: c.checkStr(obj["resource"]),
-  }}
-
-/** AdmissionRequest is generic, to allow unwrapping the inner object (once you confirm `kind`!) */
-export interface AdmissionRequest<T> {
+export interface AdmissionRequest {
   uid: string;
   kind: GroupVersionKind;
   resource: GroupVersionResource;
@@ -69,12 +44,12 @@ export interface AdmissionRequest<T> {
   namespace?: string | null;
   operation: "CREATE" | "UPDATE" | "DELETE" | "CONNECT" | c.UnexpectedEnumValue;
   userInfo: AuthnV1.UserInfo;
-  object?: T | null;
-  oldObject?: T | null;
+  object: c.JSONValue;
+  oldObject: c.JSONValue;
   dryRun?: boolean | null;
   options?: unknown; // CreateOptions, etc
 }
-export function toAdmissionRequest<T>(input: c.JSONValue, objectMapper: (input: c.JSONValue) => T): AdmissionRequest<T> {
+export function toAdmissionRequest(input: c.JSONValue): AdmissionRequest {
   const obj = c.checkObj(input);
   return {
     uid: c.checkStr(obj["uid"]),
@@ -88,12 +63,12 @@ export function toAdmissionRequest<T>(input: c.JSONValue, objectMapper: (input: 
     namespace: c.readOpt(obj["namespace"], c.checkStr),
     operation: c.readEnum(obj["operation"]),
     userInfo: AuthnV1.toUserInfo(c.checkObj(obj["userInfo"])),
-    object: c.readOpt(obj["object"], objectMapper),
-    oldObject: c.readOpt(obj["oldObject"], objectMapper),
+    object: obj["object"],
+    oldObject: obj["oldObject"],
     dryRun: c.readOpt(obj["dryRun"], c.checkBool),
     options: obj["options"],
   }}
-export function fromAdmissionRequest<T>(input: AdmissionRequest<T>, objectMapper: (input: T) => c.JSONValue): c.JSONValue {
+export function fromAdmissionRequest(input: AdmissionRequest): c.JSONValue {
   return {
     ...input,
     kind: {...input.kind},
@@ -101,22 +76,10 @@ export function fromAdmissionRequest<T>(input: AdmissionRequest<T>, objectMapper
     requestKind: input.requestKind != null ? {...input.requestKind} : undefined,
     requestResource: input.requestResource != null ? {...input.requestResource} : undefined,
     userInfo: AuthnV1.fromUserInfo(input.userInfo),
-    object: input.object != null ? objectMapper(input.object) : undefined,
-    oldObject: input.oldObject != null ? objectMapper(input.oldObject) : undefined,
     options: input.options as c.JSONValue,
   }}
 
-/** Re-interprets the object payloads within an AdmissionRequest. */
-export function transformAdmissionRequest<T,U>(original: AdmissionRequest<T>, objectMapper: (input: T) => U): AdmissionRequest<U> {
-  return {
-    ...original,
-    object: original.object ? objectMapper(original.object) : undefined,
-    oldObject: original.oldObject ? objectMapper(original.oldObject) : undefined,
-  };
-}
 
-
-/** AdmissionResponse ... */
 export interface AdmissionResponse {
   uid: string;
   allowed: boolean;
@@ -142,4 +105,31 @@ export function fromAdmissionResponse(input: AdmissionResponse): c.JSONValue {
     ...input,
     result: input.result != null ? MetaV1.fromStatus(input.result) : undefined,
     patch: input.patch != null ? Base64.encode(input.patch) : undefined,
+  }}
+
+
+export interface GroupVersionKind {
+  group:   string;
+  version: string;
+  kind:    string;
+}
+export function toGroupVersionKind(input: c.JSONValue): GroupVersionKind {
+  const obj = c.checkObj(input);
+  return {
+    group: c.checkStr(obj["group"]),
+    version: c.checkStr(obj["version"]),
+    kind: c.checkStr(obj["kind"]),
+  }}
+
+export interface GroupVersionResource {
+  group:    string;
+  version:  string;
+  resource: string;
+}
+export function toGroupVersionResource(input: c.JSONValue): GroupVersionResource {
+  const obj = c.checkObj(input);
+  return {
+    group: c.checkStr(obj["group"]),
+    version: c.checkStr(obj["version"]),
+    resource: c.checkStr(obj["resource"]),
   }}
