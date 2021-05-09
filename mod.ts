@@ -13,7 +13,10 @@ new AdmissionServer(raw => {
     case 'core/v1/Pod': {
       const request = transformAdmissionRequest(raw, CoreV1.toPod);
       appendPodPatches(request, patches);
-      console.log(`Patches for ${request.namespace}/${request.name}: ${JSON.stringify(patches)}`);
+      console.log(`${patches.length} patches for ${request.namespace}/${request.name}:`);
+      for (const patch of patches) {
+        console.log('-', JSON.stringify(patch));
+      }
     }; break;
 
   }

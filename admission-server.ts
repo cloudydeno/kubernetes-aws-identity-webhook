@@ -69,7 +69,9 @@ See also: ${repoUrl}`,
       { status: 400 });
 
     const json = await request.json();
-    console.log('Input:', JSON.stringify(json));
+    for (const slice of JSON.stringify(json).matchAll(/.{1,2000}/g)) {
+      console.log('Input chunk:', slice[0]);
+    }
 
     const rawReviewReq = toAdmissionReview(json);
     if (!rawReviewReq.request?.uid) return new Response(
