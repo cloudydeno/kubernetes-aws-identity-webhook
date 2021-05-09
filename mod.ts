@@ -1,52 +1,28 @@
 import * as CoreV1 from "https://deno.land/x/kubernetes_apis@v0.3.1/builtin/core@v1/structs.ts";
-import { JsonPatch } from "https://deno.land/x/kubernetes_apis@v0.3.1/common.ts";
-import { AdmissionRequest, transformAdmissionRequest } from "./admission-review.ts";
-import { AdmissionServer } from "./admission-server.ts";
+import { AdmissionContext, AdmissionServer } from "./admission-server.ts";
 
-new AdmissionServer(raw => {
-  let allowed = true;
-  const patches: JsonPatch = [];
-
-  // make a proprietary token to allow easy switching
-  switch ([raw.kind.group || 'core', raw.kind.version, raw.kind.kind].join('/')) {
-
-    case 'core/v1/Pod': {
-      const request = transformAdmissionRequest(raw, CoreV1.toPod);
-      appendPodPatches(request, patches);
-      console.log(`${patches.length} patches for ${request.namespace}/${request.name}:`);
-      for (const patch of patches) {
-        console.log('-', JSON.stringify(patch));
-      }
-    }; break;
-
-  }
-
-  return {
-    uid: raw.uid,
-    allowed,
-    patch: patches.length > 0 ? new TextEncoder().encode(JSON.stringify(patches)) : null,
-    patchType: patches.length > 0 ? 'JSONPatch' : null,
-  };
-}, {
+new AdmissionServer({
   name: 'aws-identity-webhook',
-  type: 'MutatingWebhook',
   repo: 'https://github.com/cloudydeno/kubernetes-aws-identity-webhook',
-  rules: `
-  - apiGroups: [""]
-    apiVersions: [v1]
-    operations: [CREATE]
-    resources: [pods]
-    scope: '*'`,
+}).withMutatingRule({
+  operations: ['CREATE'],
+  apiGroups: [''],
+  apiVersions: ['v1'],
+  resources: ['pods'],
+  scope: '*',
+  callback(ctx) {
+    const pod = CoreV1.toPod(ctx.request.object);
+    const roleArn = pod.metadata?.annotations?.['sts.amazonaws.com/role-arn'];
+    if (roleArn) {
+      ctx.log(`Discovered role-arn: ${roleArn}`);
+      appendPodPatches(ctx, pod, roleArn);
+    } else {
+      ctx.log(`No role-arn annotation found; skipping`);
+    }
+  },
 }).registerFetchEvent();
 
-function appendPodPatches(request: AdmissionRequest<CoreV1.Pod>, patches: JsonPatch) {
-
-  if (request.operation !== 'CREATE') return;
-
-  const roleArn = request.object?.metadata?.annotations?.['sts.amazonaws.com/role-arn'];
-  if (!roleArn) return;
-  // From here down, we know we want to make pod identity happen
-
+function appendPodPatches(ctx: AdmissionContext, pod: CoreV1.Pod, roleArn: string) {
   // TODO: all kinds of configurability :)
   const awsRegion = "us-west-2";
   const tokenAudience = "sts.amazonaws.com";
@@ -83,24 +59,24 @@ function appendPodPatches(request: AdmissionRequest<CoreV1.Pod>, patches: JsonPa
     },
   }];
 
-  request.object?.spec?.containers.forEach((container, idx) => {
-    appendContainerPatches({
+  pod.spec?.containers.forEach((container, idx) => {
+    appendContainerPatches(ctx, {
       container,
       desiredEnvs, desiredMount,
-      patches, patchPath: `/spec/containers/${idx}`,
+      patchPath: `/spec/containers/${idx}`,
     });
   });
 
-  request.object?.spec?.initContainers?.forEach((container, idx) => {
-    appendContainerPatches({
+  pod.spec?.initContainers?.forEach((container, idx) => {
+    appendContainerPatches(ctx, {
       container,
       desiredEnvs, desiredMount,
-      patches, patchPath: `/spec/initContainers/${idx}`,
+      patchPath: `/spec/initContainers/${idx}`,
     });
   });
 
-  const hasVolume = request.object?.spec?.volumes?.some(x => x.name === 'aws-sts-token');
-  if (!hasVolume) patches.push({
+  const hasVolume = pod.spec?.volumes?.some(x => x.name === 'aws-sts-token');
+  if (!hasVolume) ctx.addPatch({
     op: "add",
     path: "/spec/volumes/-",
     value: CoreV1.fromVolume({
@@ -117,16 +93,15 @@ function appendPodPatches(request: AdmissionRequest<CoreV1.Pod>, patches: JsonPa
   });
 }
 
-function appendContainerPatches(opts: {
+function appendContainerPatches(ctx: AdmissionContext, opts: {
   container: CoreV1.Container;
-  patches: JsonPatch;
   patchPath: string;
   desiredMount: CoreV1.VolumeMount;
   desiredEnvs: Array<CoreV1.EnvVar>;
 }) {
 
   const hasVolume = opts.container.volumeMounts?.some(x => x.name === opts.desiredMount.name);
-  if (!hasVolume) opts.patches.push({
+  if (!hasVolume) ctx.addPatch({
     op: "add",
     path: `${opts.patchPath}/volumeMounts/-`,
     value: CoreV1.fromVolumeMount(opts.desiredMount),
@@ -136,14 +111,14 @@ function appendContainerPatches(opts: {
     const hasEnvs = new Set(opts.container.env?.map(x => x.name));
     for (const envVar of opts.desiredEnvs) {
       if (hasEnvs.has(envVar.name)) continue;
-      opts.patches.push({
+      ctx.addPatch({
         op: "add",
         path: `${opts.patchPath}/env/-`,
         value: CoreV1.fromEnvVar(envVar),
       });
     }
   } else {
-    opts.patches.push({
+    ctx.addPatch({
       op: "add",
       path: `${opts.patchPath}/env`,
       value: opts.desiredEnvs.map(CoreV1.fromEnvVar),
