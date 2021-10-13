@@ -69,12 +69,7 @@ export class AdmissionServer {
       "Please provide 'content-type: application/json' header",
       { status: 400 });
 
-    const json = await request.json();
-    for (const slice of JSON.stringify(json).matchAll(/.{1,2000}/g)) {
-      console.log('Input chunk:', slice[0]);
-    }
-
-    const review = toAdmissionReview(json);
+    const review = toAdmissionReview(await request.json());
     if (!review.request?.uid) return new Response(
       "I didn't see a request in your review payload :/",
       { status: 400 });
