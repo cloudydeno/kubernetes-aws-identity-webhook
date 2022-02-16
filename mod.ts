@@ -1,5 +1,5 @@
 import * as CoreV1 from "https://deno.land/x/kubernetes_apis@v0.3.1/builtin/core@v1/structs.ts";
-import { AdmissionContext, AdmissionServer } from "./admission-server.ts";
+import { AdmissionContext, AdmissionServer } from "https://deno.land/x/kubernetes_admission@v0.1.0/mod.ts";
 
 new AdmissionServer({
   name: 'aws-identity-webhook',
@@ -20,7 +20,7 @@ new AdmissionServer({
       ctx.log(`No role-arn annotation found; skipping`);
     }
   },
-}).registerFetchEvent();
+}).serve();
 
 function appendPodPatches(ctx: AdmissionContext, pod: CoreV1.Pod, roleArn: string) {
   // TODO: all kinds of configurability :)
