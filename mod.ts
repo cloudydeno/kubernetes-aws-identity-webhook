@@ -1,5 +1,5 @@
-import * as CoreV1 from "https://deno.land/x/kubernetes_apis@v0.3.1/builtin/core@v1/structs.ts";
-import { AdmissionContext, AdmissionServer } from "https://deno.land/x/kubernetes_admission@v0.1.0/mod.ts";
+import * as CoreV1 from "@cloudydeno/kubernetes-apis/core/v1";
+import { AdmissionContext, AdmissionServer } from "@cloudydeno/kubernetes-admission";
 
 new AdmissionServer({
   name: 'aws-identity-webhook',
