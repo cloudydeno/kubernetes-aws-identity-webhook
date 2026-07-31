@@ -1,6 +1,6 @@
 {
   "imports": {
     "@cloudydeno/kubernetes-admission": "jsr:@cloudydeno/kubernetes-admission@^0.2",
-    "@cloudydeno/kubernetes-apis": "jsr:@cloudydeno/kubernetes-apis@^0.7"
+    "@cloudydeno/kubernetes-apis": "jsr:@cloudydeno/kubernetes-apis@^0.7.2"
   }
 }
