@@ -1,0 +1,20 @@
+version: 2
+updates:
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      official:
+        patterns:
+        - "actions/*"
+
+  - package-ecosystem: deno
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      std:
+        patterns:
+        - "@std/*"
